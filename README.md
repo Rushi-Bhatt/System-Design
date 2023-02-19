@@ -163,18 +163,18 @@ How to achieve synchronization: real time vs eventual, QOS,
 
 5) Backend Components: 
 
-* 1. Load Balancer: Distribute the load on server to horizontally scale the architecture.  (Round robin, lease connection, hashing etc) - Nginx 
-* 2. Front end caching using CDN: Stores videos/images or static contents, servers are distributed all over the world to reduce latency, clients are served with nearest server - AmazonS3. Exp.. Localized static texts, or video trailers for recent movies. 
-* 3. Elastic Search: is used to support Search and analyitics APIs. Its distributed and RESTful. NO SQL db search
-* 4. Redis cache: Remote Dictionary Server, is a fast, open source, in-memory, key-value data store. All Redis data resides in memory, which enables low latency and high throughput data access. Unlike traditional databases, In-memory data stores don’t require a trip to disk, reducing engine latency to microseconds. Because of this, in-memory data stores can support an order of magnitude more operations and faster response times. Can also use Memcache. It also supports blocking mechanism to hold the reservation. 
-* 5. Database: 
-    1. RDBMS: Proper relational representation, with ACID property, transaction handling. If its read heavy, use master slave architecture (slave for reading, master for writing) and data sharding. 
-    2. NO SQL: store unstructured data like movie info, actors, crews, reviews, comments.  So use distributed NOSQL database - Cassandra 
-* 6. Async workers: Handle async tasks, uses Messaging queues. Mainly used for ticket generations, sending notifications, emails and SMS.  Tasks which are time consuming and should not be handled synchronously. 
-    1. Server sends a task to messaging queue, and a free worker will pick it up, and execute it. <- Python Celery workers
-    2. Kafka/RabbitMQ for distributed messaging queue. 
-    3. Third party services for SMS/Email
-    4. APNS for sending push notifications using Airship or something else. 
-* 7. ML/BI: Hadoop platform, used generally for recommendation system like movies, hotels etc.
-* 8. Log management: ELK (Elastic search, Logstash, Cabana) logging analytics and monitoring 
-* 9. Payment Gateways: PayPal, strip, square etc <—- read about payment services 
+* Load Balancer: Distribute the load on server to horizontally scale the architecture.  (Round robin, lease connection, hashing etc) - Nginx 
+* Front end caching using CDN: Stores videos/images or static contents, servers are distributed all over the world to reduce latency, clients are served with nearest server - AmazonS3. Exp.. Localized static texts, or video trailers for recent movies. 
+* Elastic Search: is used to support Search and analyitics APIs. Its distributed and RESTful. NO SQL db search
+* Redis cache: Remote Dictionary Server, is a fast, open source, in-memory, key-value data store. All Redis data resides in memory, which enables low latency and high throughput data access. Unlike traditional databases, In-memory data stores don’t require a trip to disk, reducing engine latency to microseconds. Because of this, in-memory data stores can support an order of magnitude more operations and faster response times. Can also use Memcache. It also supports blocking mechanism to hold the reservation. 
+* Database: 
+    * RDBMS: Proper relational representation, with ACID property, transaction handling. If its read heavy, use master slave architecture (slave for reading, master for writing) and data sharding. 
+    * NO SQL: store unstructured data like movie info, actors, crews, reviews, comments.  So use distributed NOSQL database - Cassandra 
+* Async workers: Handle async tasks, uses Messaging queues. Mainly used for ticket generations, sending notifications, emails and SMS.  Tasks which are time consuming and should not be handled synchronously. 
+    * Server sends a task to messaging queue, and a free worker will pick it up, and execute it. <- Python Celery workers
+    * Kafka/RabbitMQ for distributed messaging queue. 
+    * Third party services for SMS/Email
+    * APNS for sending push notifications using Airship or something else. 
+* ML/BI: Hadoop platform, used generally for recommendation system like movies, hotels etc.
+* Log management: ELK (Elastic search, Logstash, Cabana) logging analytics and monitoring 
+* Payment Gateways: PayPal, strip, square etc <—- read about payment services 
