@@ -54,6 +54,10 @@ Mobile System Design Template:
   * File based storage: Images and other media. Do we need caching locally? 
 * Accessibility: 
   * Make App accessible by proper contrast, atleast 44pt target, custom calling, dynamic font size
+  * Resources: 
+  	* https://medium.com/swiftcommmunity/accessibility-in-ios-hands-on-code-971a219290f8
+  	* https://www.hackingwithswift.com/articles/91/checklist-how-to-make-your-ios-app-more-accessible
+  	* https://www.youtube.com/playlist?list=PLIl2EzNYri0cLtSlZowttih25VnSvWITu
 * Security: 
   * Storing sensitive data like access token, PII data (key chain or smart lock, but not in User defaults)
   * One good practice to securely store secrets (like API Key) is to utilize .xcconfig configuration file, and ignore it using .ignore so your repo won’t have it, Or you can use private CloudKit database 
