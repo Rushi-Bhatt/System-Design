@@ -95,6 +95,12 @@ Mobile System Design Template:
 6) Caching: Caching and cache eviction policy (like LRU)
 7) Helper service/Managers: Networking service, session service, Database service, Credential store
 8) Third Party Libraries: sd_webImage, RX_Swift/PromiseKit, SnapKit, Alamofire, Adjust, SwiftLint, Firebase, etc. ( I personally avoid using those for AppSize issues)
+* Issues: 
+ 	* Size increase 
+ 	* Privacy 
+ 	* Binary stability and minimum version support 
+ 	* Bugs and crashes in the library 
+ 	* Stopped support 
 
 
 ## Step 4:
@@ -118,56 +124,41 @@ Further refinement
 
 Template:  https://systeminterview.com/drawing.php -> Download the template 
 
-Data layer: 
+## More details about some components:
 
-Repository Pattern between network and service: https://pyartez.github.io/architecture/repository-pattern-in-swift-and-combine.html
-Use the repository when using offline mode, because response from API and response from core data might be different, so rather than using Coddle or NSManagerObjects objects throughout the app, you can use Domain Objects. 
+1) Data layer: 
+* Repository Pattern between network and service: https://pyartez.github.io/architecture/repository-pattern-in-swift-and-combine.html
+* Use the repository when using offline mode, because response from API and response from core data might be different, so rather than using Coddle or NSManagerObjects objects throughout the app, you can use Domain Objects. 
 
 
-API Layer: 
-
-1) Authorization: ???
-2) Pagination: Offset vs cursor based vs keyset based. <-  bad idea to use offset based especially if new posts keep getting added. 
-3) Compression: For large HTTP responses, use gzip to compress the response. Gzip is supported out-of-the box in NSURLSession and automatically communicates to network servers that it can handle gzipped data. When the server sends down gzipped data, NSURLSession automatically de-compresses it; you don't have to do anything.: https://clintmartin.net/2016/03/15/gzipping-ios-apps.html - Problem:  doesn’t work well with progress download calculations 
-4) Serialization: Protobuf vs JSON vs XML: Protocol buffers are a flexible, efficient, automated mechanism for serializing structured data: https://sprinkle-twinkles.medium.com/what-is-protobuf-and-when-to-consider-it-over-xml-json-for-web-services-communication-d91158b57d4a. 
+2) API Layer: 
+* Authorization: Figure out some basic Auth libraries, Firebase, OAuth2. 
+* Pagination: Offset vs cursor based vs keyset based. <-  bad idea to use offset based especially if new posts keep getting added. 
+* Compression: For large HTTP responses, use gzip to compress the response. Gzip is supported out-of-the box in NSURLSession and automatically communicates to network servers that it can handle gzipped data. When the server sends down gzipped data, NSURLSession automatically de-compresses it; you don't have to do anything: https://clintmartin.net/2016/03/15/gzipping-ios-apps.html - Problem:  doesn’t work well with progress download calculations 
+* Serialization: Protobuf vs JSON vs XML: Protocol buffers are a flexible, efficient, automated mechanism for serializing structured data: https://sprinkle-twinkles.medium.com/what-is-protobuf-and-when-to-consider-it-over-xml-json-for-web-services-communication-d91158b57d4a. 
 	1) Why one over another? 
 	2) what happens when the backend changes the version, how client handles it?   
-5) Security: Large scale application: Exponential back off , rate limiting to prevent DDOS 
-6) Quality of service for each API: some APIs are higher priority and we can execute them using higher QOS (like fetching list of posts info should be higher QOS than downloading thumbnail for those posts)
-7) 
+* Large scale application: Exponential back off , rate limiting to prevent DDOS 
+* Quality of service for each API: some APIs are higher priority and we can execute them using higher QOS (like fetching list of posts info should be higher QOS than downloading thumbnail for those posts)
+ 
 
-Persistence layer/caching: 
-caching policy: based on time, based on count, and these timestamp/count should come from the remote config/backend so in future we can customize the caching policy. For default value, we can investigate and see what makes sense (based on users scroll behavior, size of each data unit, users device memory  etc).  Example, for reddit with 100 character per post, user will see mostly 4 posts per screen, and lets say we want to handle for 5 page scroll behavior, so store 20 posts in cache. 
-Cache clearing policy: LRU 
-Image caching: Image caching will have its own image cache and image loader. Since images are stored in CDN, we can use few features from there: example
- thumbnail vs regular image - based on use case 
-download image based on the device resolution (i.e https://cdn.image.com/255?width=100&height=100) - In real large apps, generally server sends all different image urls to clients, and then client decides which one to use. So server can cache that particular response efficiently. 
-Resolution based: low/medium/high based on my devices network connection 
-Cleaning: LRU policy, but How would you sync it with actual cache that stores your response? i.e lets say you store all the posts for a user in cache, and images for that post in image cache. When you remove the post from cache, how will you remove respective images from image cache? Also, what if that image is being used by another post ?
-Generally bad idea to use imageURLs as keys for the image cache, they are very long and may vary based on locale in many cases, so better way is to have resourceID (BE generated) as key for caching 
+3) Persistence layer/caching: 
+* caching policy: based on time, based on count, and these timestamp/count should come from the remote config/backend so in future we can customize the caching policy. For default value, we can investigate and see what makes sense (based on users scroll behavior, size of each data unit, users device memory  etc).  Example, for reddit with 100 character per post, user will see mostly 4 posts per screen, and lets say we want to handle for 5 page scroll behavior, so store 20 posts in cache. Always start with defining disk/memory usage: Start with “I don’t want to utilize more than X MB in cache”
+* Image caching: Image caching will have its own image cache and image loader. Since images are stored in CDN, we can use few features from there: example
+	* thumbnail vs regular image - based on use case 
+	* download image based on the device resolution (i.e https://cdn.image.com/255?width=100&height=100) - In real large apps, generally server sends all different image urls to clients, and then client decides which one to use. So server can cache that particular response efficiently. 
+	* Resolution based: low/medium/high based on my devices network connection 
+* Cache Clearing Policy: LRU policy, but How would you sync it with actual cache that stores your response? i.e lets say you store all the posts for a user in cache, and images for that post in image cache. When you remove the post from cache, how will you remove respective images from image cache? Also, what if that image is being used by another post ?
+* Generally bad idea to use imageURLs as keys for the image cache, they are very long and may vary based on locale in many cases, so better way is to have resourceID (BE generated) as key for caching 
 
-4) Caching: start with defining disk/memory usage: Start with “I don’t want to utilize more than X MB in cache”
 
-Offline mode: 
-Conflict resolution: lets say we update the details in our local cache while offline, and that too on multiple devices, how to handle that? - ideally to propagate the last update to server, so example, for postID 10, if you like it from iPhone at timestamp 00:25 and if you dislike it from iPad at timeStamp 00:30, then once any of these device goes online, you update the server DB with postID, timestamp and like/dislike. And when the 2nd device goes online, check if that timestamp is the latest one, if not, ignore , else update the DB. It works but what if you change your device time clock ? Well in that case, better to leave the conflict resolution to server side, whatever device can go online first, wins and then the 2nd update will be ignored.  (Exp. Instagram doesn’t even update the offline likes). We can also use what Github does in the case of conflicts, and use three way merge or basically ask users to merge the conflict by showing popup.  https://hasura.io/blog/design-guide-to-offline-first-apps/
+4) Offline mode: 
+* Conflict resolution: lets say we update the details in our local cache while offline, and that too on multiple devices, how to handle that? - ideally to propagate the last update to server, so example, for postID 10, if you like it from iPhone at timestamp 00:25 and if you dislike it from iPad at timeStamp 00:30, then once any of these device goes online, you update the server DB with postID, timestamp and like/dislike. And when the 2nd device goes online, check if that timestamp is the latest one, if not, ignore , else update the DB. It works but what if you change your device time clock ? Well in that case, better to leave the conflict resolution to server side, whatever device can go online first, wins and then the 2nd update will be ignored.  (Exp. Instagram doesn’t even update the offline likes). We can also use what Github does in the case of conflicts, and use three way merge or basically ask users to merge the conflict by showing popup.  https://hasura.io/blog/design-guide-to-offline-first-apps/
 
-Now these updates might be heavy considering how much local cache you have and how often these have changed, so once we go online, first try and fetch all latest reads/posts/threads and then after some time, try to update the server with these offline values (user don’t care about likes on old post, but rather want to see the new posts from server)
+* Now these updates might be heavy considering how much local cache you have and how often these have changed, so once we go online, first try and fetch all latest reads/posts/threads and then after some time, try to update the server with these offline values (user don’t care about likes on old post, but rather want to see the new posts from server)
 How to achieve synchronization: real time vs eventual, QOS, 
 
-Third party dependencies: 
-Issues: 
-1) Size increase 
-2) Privacy 
-3) Binary stability and minimum version support 
-4) Bugs and crashes in the library 
-5) Stopped support 
 
-UI- Layer: 
-Design systems: https://github.com/ChiliLabs/ios_DesignSystemExample
-https://www.ramshandilya.com/blog/design-system-intro/
-
-
-Configurator to configure cells : https://chililabs.io/blog/configuring-multiple-cells-with-generics-in-swift
-
-
-
+5) UI- Layer: 
+* Design systems: https://github.com/ChiliLabs/ios_DesignSystemExample, https://www.ramshandilya.com/blog/design-system-intro/
+* Configurator to configure cells : https://chililabs.io/blog/configuring-multiple-cells-with-generics-in-swift
