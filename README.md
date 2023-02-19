@@ -58,6 +58,7 @@ Mobile System Design Template:
   * Storing sensitive data like access token, PII data (key chain or smart lock, but not in User defaults)
   * One good practice to securely store secrets (like API Key) is to utilize .xcconfig configuration file, and ignore it using .ignore so your repo won’t have it, Or you can use private CloudKit database 
   * Secure Communication: Make backend communication secure using HTTPS, TLS, Cert pinning
+  * Exponential back off, rate limiting to prevent DDOS 
 * Scalability
   * Deal with growing codebase and team size
   * Modularize the App, break and standardize the reusable UI
@@ -65,7 +66,10 @@ Mobile System Design Template:
 * Performance
   * Are there any UI intensive operation? Like Infinite list scrolling, heavy animation, complex transition -> you could prefetch data and create a buffer 
   * Asynchronous media load by different service so UI is slick 
-  * Pagination for API response 
+  * Pagination for API response:  Offset vs cursor based vs keyset based. <-  bad idea to use offset based especially if new posts keep getting added. 
+  * Response Zipping: For large HTTP responses, use gzip to compress the response. Gzip is supported out-of-the box in NSURLSession and automatically communicates to network servers that it can handle gzipped data. When the server sends down gzipped data, NSURLSession automatically de-compresses it; you don't have to do anything: https://clintmartin.net/2016/03/15/gzipping-ios-apps.html - Problem:  doesn’t work well with progress download calculations
+  * Quality of service for each API: some APIs are higher priority and we can execute them using higher QOS (like fetching list of posts info should be higher QOS than downloading thumbnail for those posts)  
+  * Caching  
   * Use CDN for images and static content, this will cache things and improve the performance
   * Throttling and debouncing using timers or app lifecycle state observing to reduce the number of calls 
 * Testing: 
@@ -85,14 +89,16 @@ Mobile System Design Template:
 2) Networking/Client-server communication:  
 * Is REST API okay? Generally okay for unidirectional communication. Other common protocols are SOAP, GraphQL, RPC: https://www.youtube.com/watch?v=NFw0HznpLlM
 * Is HTTP Okay? Or do we need live updates and low latency, i.e in other words, bidirectional communication? If so, how will you push the updates to the client? Push notification, polling, web socket, heartbeats or silent notifications
+* Serialization: Protobuf vs JSON vs XML: Protocol buffers are a flexible, efficient, automated mechanism for serializing structured data: https://sprinkle-twinkles.medium.com/what-is-protobuf-and-when-to-consider-it-over-xml-json-for-web-services-communication-d91158b57d4a.
+* Authorization: Figure out some basic Auth libraries, Firebase, OAuth2.
 * Do we need to support slow network? How would the behavior change? 
 * Do we support background tasks? Do we maintain state if the app is terminated? 
-* Reachability: Handle Airplane mode
+* Reachability: Offline mode. More details given below. 
 
 3) Communication between components: Delegate/protocols, Reactive patterns, or Closures 
 4) Navigation: Using Router component 
 5) Storage: Repositories, Network Data, Persisted Data
-6) Caching: Caching and cache eviction policy (like LRU)
+6) Caching: Caching and cache eviction policy (like LRU). More details given below. 
 7) Helper service/Managers: Networking service, session service, Database service, Credential store
 8) Third Party Libraries: sd_webImage, RX_Swift/PromiseKit, SnapKit, Alamofire, Adjust, SwiftLint, Firebase, etc. ( I personally avoid using those for AppSize issues)
 * Issues: 
@@ -129,20 +135,8 @@ Template:  https://systeminterview.com/drawing.php -> Download the template
 1) Data layer: 
 * Repository Pattern between network and service: https://pyartez.github.io/architecture/repository-pattern-in-swift-and-combine.html
 * Use the repository when using offline mode, because response from API and response from core data might be different, so rather than using Coddle or NSManagerObjects objects throughout the app, you can use Domain Objects. 
-
-
-2) API Layer: 
-* Authorization: Figure out some basic Auth libraries, Firebase, OAuth2. 
-* Pagination: Offset vs cursor based vs keyset based. <-  bad idea to use offset based especially if new posts keep getting added. 
-* Compression: For large HTTP responses, use gzip to compress the response. Gzip is supported out-of-the box in NSURLSession and automatically communicates to network servers that it can handle gzipped data. When the server sends down gzipped data, NSURLSession automatically de-compresses it; you don't have to do anything: https://clintmartin.net/2016/03/15/gzipping-ios-apps.html - Problem:  doesn’t work well with progress download calculations 
-* Serialization: Protobuf vs JSON vs XML: Protocol buffers are a flexible, efficient, automated mechanism for serializing structured data: https://sprinkle-twinkles.medium.com/what-is-protobuf-and-when-to-consider-it-over-xml-json-for-web-services-communication-d91158b57d4a. 
-	1) Why one over another? 
-	2) what happens when the backend changes the version, how client handles it?   
-* Large scale application: Exponential back off , rate limiting to prevent DDOS 
-* Quality of service for each API: some APIs are higher priority and we can execute them using higher QOS (like fetching list of posts info should be higher QOS than downloading thumbnail for those posts)
  
-
-3) Persistence layer/caching: 
+2) Persistence layer/caching: 
 * caching policy: based on time, based on count, and these timestamp/count should come from the remote config/backend so in future we can customize the caching policy. For default value, we can investigate and see what makes sense (based on users scroll behavior, size of each data unit, users device memory  etc).  Example, for reddit with 100 character per post, user will see mostly 4 posts per screen, and lets say we want to handle for 5 page scroll behavior, so store 20 posts in cache. Always start with defining disk/memory usage: Start with “I don’t want to utilize more than X MB in cache”
 * Image caching: Image caching will have its own image cache and image loader. Since images are stored in CDN, we can use few features from there: example
 	* thumbnail vs regular image - based on use case 
@@ -152,13 +146,13 @@ Template:  https://systeminterview.com/drawing.php -> Download the template
 * Generally bad idea to use imageURLs as keys for the image cache, they are very long and may vary based on locale in many cases, so better way is to have resourceID (BE generated) as key for caching 
 
 
-4) Offline mode: 
+3) Offline mode: 
 * Conflict resolution: lets say we update the details in our local cache while offline, and that too on multiple devices, how to handle that? - ideally to propagate the last update to server, so example, for postID 10, if you like it from iPhone at timestamp 00:25 and if you dislike it from iPad at timeStamp 00:30, then once any of these device goes online, you update the server DB with postID, timestamp and like/dislike. And when the 2nd device goes online, check if that timestamp is the latest one, if not, ignore , else update the DB. It works but what if you change your device time clock ? Well in that case, better to leave the conflict resolution to server side, whatever device can go online first, wins and then the 2nd update will be ignored.  (Exp. Instagram doesn’t even update the offline likes). We can also use what Github does in the case of conflicts, and use three way merge or basically ask users to merge the conflict by showing popup.  https://hasura.io/blog/design-guide-to-offline-first-apps/
 
 * Now these updates might be heavy considering how much local cache you have and how often these have changed, so once we go online, first try and fetch all latest reads/posts/threads and then after some time, try to update the server with these offline values (user don’t care about likes on old post, but rather want to see the new posts from server)
 How to achieve synchronization: real time vs eventual, QOS, 
 
 
-5) UI- Layer: 
+4) UI- Layer: 
 * Design systems: https://github.com/ChiliLabs/ios_DesignSystemExample, https://www.ramshandilya.com/blog/design-system-intro/
 * Configurator to configure cells : https://chililabs.io/blog/configuring-multiple-cells-with-generics-in-swift
